@@ -1,0 +1,748 @@
+INCLUDE Irvine32.inc
+.data
+    board dword 0, 0, 0 , 0
+    rowSize = ($-board)
+        dword 0, 0, 0, 0
+        dword 0, 0, 0, 0
+        dword 0, 0, 0, 0
+
+prompt db "YOU WIN",0
+youlose db "BETTER LUCK NEXT TIME.",0
+winCondition byte 0
+variable byte 0
+
+titl byte "2048 GAME",0
+i dword ?
+j dword ?
+k dword 0
+
+guide db "CONTROLS : D  for right, A for left, W for Up, S for down.",0
+endcond db 0
+sc db "SCORE: ",0
+
+score dword 0
+.code
+
+gameTitle proc
+mov eax, black + (lightred * 16) ; white on red
+    call SetTextColor
+mov dh,4
+mov dl,32
+call gotoxy
+mov eax,' '
+call writechar
+mov edx,offset titl
+call writestring
+mov eax,' '
+call writechar
+ret
+gameTitle endp
+
+controlGuide proc
+mov eax,white +(black * 16) ; white on blue
+call SetTextColor
+;add dl,2
+;call gotoxy
+mov dh,19
+mov dl,13
+call gotoxy
+mov eax, black + (lightred * 16) ; white on red
+    call SetTextColor
+mov edx,offset guide
+call writestring
+mov eax, white + (black* 16) ; white on red
+    call SetTextColor
+ret
+controlGuide endp
+
+
+border proc
+;---
+mov eax, white + (lightred * 16) ; white on red
+call SetTextColor
+mov dh,6
+mov dl,26
+call gotoxy
+mov ecx,32
+mov eax,' '
+lin:
+call writechar
+loop lin
+;----
+;---
+mov eax, white + (lightred * 16) ; white on red
+call SetTextColor
+mov dh,6
+mov dl,26
+call gotoxy
+mov ecx,11
+mov eax,' '
+lin3:
+call gotoxy
+inc dh
+call writechar
+loop lin3
+;----
+;---
+mov eax, white + (lightred* 16) ; white on red
+call SetTextColor
+mov dh,16
+mov dl,26
+call gotoxy
+mov ecx,32
+mov eax,' '
+lin2:
+call writechar
+loop lin2
+
+;----
+;---
+mov eax, white + (lightred  * 16) ; white on red
+call SetTextColor
+mov dh,6
+mov dl,58
+call gotoxy
+mov ecx,11
+mov eax,' '
+lin4:
+call gotoxy
+inc dh
+call writechar
+loop lin4
+;----
+ret
+border endp
+drawBoard proc
+;WRITES THE WHOLE ARRAY TO THE CONSOLE
+call gameTitle
+mov dh,8
+mov dl,32
+
+    mov esi,offset board
+    mov eax,0
+    mov ebx,0
+    mov ecx,4
+    .while ecx != 0
+        push ecx
+        mov ecx,4
+         .while ecx != 0
+call gotoxy
+            mov eax,[esi+ebx]
+.if eax == 0
+mov eax,black +(magenta * 16) ; white on blue
+call SetTextColor
+mov eax,' '
+call writechar
+.elseif eax == 2
+mov eax,white+(red * 16) ; white on blue
+call SetTextColor
+mov eax,' '
+call writechar
+.elseif eax == 4
+mov eax,white+(blue * 16) ; white on blue
+call SetTextColor
+mov eax,' '
+call writechar
+.elseif eax == 8
+mov eax,white+(cyan * 16) ; white on blue
+call SetTextColor
+mov eax,' '
+call writechar
+.elseif eax == 16
+mov eax,white+(green * 16) ; white on blue
+call SetTextColor
+mov eax,' '
+call writechar
+.elseif eax == 32
+mov eax,white+(brown * 16) ; white on blue
+call SetTextColor
+mov eax,' '
+call writechar
+.elseif eax == 64
+mov eax,white+(yellow * 16) ; white on blue
+call SetTextColor
+mov eax,' '
+call writechar
+.else
+mov eax,white+(lightcyan * 16) ; white on blue
+call SetTextColor
+mov eax,' '
+call writechar
+.endif
+            mov eax,[esi+ebx]
+            call writedec
+mov eax,' '
+call writechar
+
+add dl, 6
+            add ebx,4
+dec ecx
+        .endw
+mov dl,32
+add dh,2
+        pop ecx
+dec ecx
+    .endw
+call border
+call controlGuide
+
+ret
+drawBoard endp
+genRandom proc
+;TURNS A Zero To 2 or 4 after each turn
+    mov  eax,16
+    call RandomRange
+mov edx,4
+mul edx
+    mov edx,offset board
+    mov ebx,[edx+eax]
+    cmp bl,0
+    jz yes
+    call genRandom
+    ret
+    yes:
+    push eax
+    call generateTWOorFour
+    pop eax
+    mov [edx+eax],bl
+ret
+genRandom endp
+generateTWOorFour proc
+;Returns 2 or 4 for genRandom proc
+    mov  eax,5
+    call RandomRange
+    cmp eax,2
+    jz yes2
+    cmp eax,4
+    jz yes2
+    call generateTWOorFour
+    yes2:
+    mov ebx,eax
+ret
+generateTWOorFour endp
+windcondition proc
+;Checks if there is a 2048 on board
+mov ecx,16
+mov edx,offset board
+check:
+mov eax,2048
+.if [edx] == eax
+mov edx,offset prompt
+call writestring
+ret
+mov winCondition,1
+.else
+add edx,4
+.endif
+loop check
+ret
+windcondition endp
+
+inputD proc
+mov edx,0
+mov esi,offset board
+mov eax,0
+mov ebx,0
+mov ecx,4
+check:
+.if [esi] != edx
+.if eax != edx
+mov eax,[esi]
+mov edi,esi
+.else
+mov ebx,[esi]
+.endif
+.if eax == ebx
+add eax,ebx
+mov esi,eax
+push eax
+mov eax,0
+mov [edi],eax
+pop eax
+mov eax,0
+mov ebx,0
+.else
+mov eax,ebx
+mov edi,esi
+mov ebx,0
+.endif
+.endif
+loop check
+;first rotating
+mov k,0
+.while k < 49  
+mov edi,0
+mov edx,offset board
+mov ebx,0
+add edx,12
+add edx,k
+push ecx
+mov ecx,4
+.WHILE ecx>0
+.if [edx] == edi
+.if ebx == edi
+mov ebx,edx
+.endif
+.elseif (ebx != edi) && ([edx] != edi)
+push eax
+mov eax,[edx]
+mov [ebx],eax
+mov eax,0
+mov [edx],eax
+pop eax
+sub ebx,4
+.endif
+sub edx,4
+dec ecx
+.ENDW
+pop ecx
+add k,16
+.endw
+;now adding
+mov k,0
+.while k < 49
+mov eax,12
+push ecx
+mov ecx,4
+push edx
+mov edx,offset board
+add edx,12
+add edx,k
+.WHILE ecx>0
+push ecx
+mov ecx,eax
+push eax
+mov eax,[edx+4]
+.IF ([edx]==eax) && (ecx!=12) && ([edx]!=edi)
+push eax
+mov eax,[edx]
+add [edx+4],eax
+add score,eax
+add score,eax
+mov eax,0
+mov [edx],eax
+pop eax
+
+.ENDIF
+pop eax
+sub edx,4
+sub eax,4
+pop ecx
+dec ecx
+.ENDW
+add k,16
+pop edx
+pop ecx
+.endw
+;again rotating
+;first rotating
+mov k,0
+.while k < 49  
+mov edi,0
+mov edx,offset board
+mov ebx,0
+add edx,12
+add edx,k
+push ecx
+mov ecx,4
+.WHILE ecx>0
+
+.if [edx] == edi
+.if ebx == edi
+mov ebx,edx
+.endif
+.elseif (ebx != edi) && ([edx] != edi)
+push eax
+mov eax,[edx]
+mov [ebx],eax
+mov eax,0
+mov [edx],eax
+pop eax
+sub ebx,4
+.endif
+sub edx,4
+dec ecx
+.ENDW
+pop ecx
+add k,16
+.endw
+ret
+inputD endp
+inputS proc
+mov i,0
+.while i != 16
+mov j,4
+mov ebx,0
+mov esi,0
+mov ecx,3 ;FOR LOOP
+.while ecx != -1
+mov eax,ecx ;move counter
+mul j ;multiply by 4 to get correct row
+mul j
+mov edi,offset board ;move board addresss
+add edi,eax ;add counter values to get address to get desired number
+add edi,i ;add row number
+mov al,[edi]
+.if al != 0 ;if value is not zero
+.if ebx != 0 ;if we already have a zero before that
+.if al == [ebx]
+mov [edi],esi
+mov eax,[ebx]
+add eax,[ebx]
+add score,eax
+mov [ebx],al
+mov ebx,0
+.else
+mov ebx,edi
+.endif
+.elseif ebx == 0
+mov ebx,edi
+.endif
+.endif
+dec ecx
+.endw
+add i,4
+.endw
+;MOVING!!!
+;---------------------
+mov i,0
+.while i != 16
+mov j,4
+mov ebx,0
+mov esi,0
+mov ecx,3 ;FOR LOOP
+.while ecx != -1 ;4 items of first column
+mov eax,ecx ;move counter
+mul j ;multiply by 4 to get correct row
+mul j
+mov edi,offset board ;move board addresss
+add edi,eax ;add counter values to get address to get desired number
+add edi,i ;add row number
+mov al,[edi] ;get current value
+.if al != 0 ;if value is not zero
+.if ebx != 0 ;if we already have a zero before that
+mov [ebx],al ;move the value to correct location
+mov [edi],esi ;make current value zero
+mov ebx,edi ;make current address next zero
+add edi,16 ;just in case we miss a zero between shifting
+mov dl,[edi]
+.if dl == 0
+mov ebx,edi
+.endif
+.endif
+.else
+.if ebx == 0
+mov ebx,edi ;WE got a zero
+.endif
+.endif
+dec ecx ;LOOP
+.endw
+add i,4
+.endw
+;---------------------------
+;---------------------------
+;---------------------------
+ret
+inputS endp
+inputA proc
+mov edx,0
+mov esi,offset board
+mov eax,0
+mov ebx,0
+mov ecx,4
+check:
+.if [esi] != edx
+.if eax != edx
+mov eax,[esi]
+mov edi,esi
+.else
+mov ebx,[esi]
+.endif
+.if eax == ebx
+add eax,ebx
+mov esi,eax
+push eax
+mov eax,0
+mov [edi],eax
+pop eax
+mov eax,0
+mov ebx,0
+.else
+mov eax,ebx
+mov edi,esi
+mov ebx,0
+.endif
+.endif
+loop check
+
+
+mov k,0
+.WHILE k<49
+;first rotating
+mov edi,0
+mov edx,offset board
+mov ebx,0
+add edx,k
+
+push ecx
+mov ecx,4
+.WHILE ecx>0
+
+.if [edx] == edi
+.if ebx == edi
+mov ebx,edx
+.endif
+.elseif (ebx != edi) && ([edx] != edi)
+push eax
+mov eax,[edx]
+mov [ebx],eax
+mov eax,0
+mov [edx],eax
+pop eax
+add ebx,4
+.endif
+
+add edx,4
+dec ecx
+
+.ENDW
+pop ecx
+ add k,16
+.ENDW
+
+;now adding
+mov k,0
+.WHILE k<49
+mov eax,0
+push ecx
+mov ecx,4
+push edx
+mov edx,offset board
+add edx,k
+
+.WHILE ecx>0
+push ecx
+mov ecx,eax
+push eax
+mov eax,[edx-4]
+.IF ([edx]==eax) && (ecx!=0) && ([edx]!=edi)
+push eax
+mov eax,[edx]
+add [edx-4],eax
+add score,eax
+add score,eax
+mov eax,0
+mov [edx],eax
+pop eax
+
+.ENDIF
+pop eax
+add edx,4
+add eax,4
+pop ecx
+dec ecx
+.ENDW
+pop edx
+pop ecx
+add k,16
+.ENDW
+
+;again rotating
+mov k,0
+.WHILE k<49
+mov edi,0
+mov edx,offset board
+mov ebx,0
+add edx,k
+
+push ecx
+mov ecx,4
+.WHILE ecx>0
+
+.if [edx] == edi
+.if ebx == edi
+mov ebx,edx
+.endif
+.elseif (ebx != edi) && ([edx] != edi)
+push eax
+mov eax,[edx]
+mov [ebx],eax
+mov eax,0
+mov [edx],eax
+pop eax
+add ebx,4
+.endif
+
+add edx,4
+dec ecx
+
+.ENDW
+pop ecx
+add k,16
+.ENDW
+
+
+ret
+inputA endp
+inputW proc
+mov i,0
+.while i != 16
+mov j,4
+mov ebx,0
+mov esi,0
+mov ecx,0 ;FOR LOOP
+.while ecx != 4
+mov eax,ecx ;move counter
+mul j ;multiply by 4 to get correct row
+mul j
+mov edi,offset board ;move board addresss
+add edi,eax ;add counter values to get address to get desired number
+add edi,i ;add row number
+mov al,[edi]
+.if al != 0 ;if value is not zero
+.if ebx != 0 ;if we already have a zero before that
+.if al == [ebx]
+mov [edi],esi
+mov eax,[ebx]
+add eax,[ebx]
+add score,eax
+mov [ebx],al
+mov ebx,0
+.else
+mov ebx,edi
+.endif
+.elseif ebx == 0
+mov ebx,edi
+.endif
+.endif
+inc ecx
+.endw
+add i,4
+.endw
+;MOVING!!!
+;---------------------
+mov i,0
+.while i != 16
+mov j,4
+mov ebx,0
+mov esi,0
+mov ecx,0 ;FOR LOOP
+.while ecx != 4 ;4 items of first column
+mov eax,ecx ;move counter
+mul j ;multiply by 4 to get correct row
+mul j
+mov edi,offset board ;move board addresss
+add edi,eax ;add counter values to get address to get desired number
+add edi,i ;add row number
+mov al,[edi] ;get current value
+.if al != 0 ;if value is not zero
+.if ebx != 0 ;if we already have a zero before that
+mov [ebx],al ;move the value to correct location
+mov [edi],esi ;make current value zero
+mov ebx,edi ;make current address next zero
+sub edi,16 ;just in case we miss a zero between shifting
+mov dl,[edi]
+.if dl == 0
+mov ebx,edi
+.endif
+.endif
+.else
+.if ebx == 0
+mov ebx,edi ;WE got a zero
+.endif
+.endif
+inc ecx ;LOOP
+.endw
+add i,4
+.endw
+;---------------------------
+;---------------------------
+;---------------------------
+ret
+inputW endp
+userInput proc
+;Takes input from user for movement A,S,D,W
+call readchar
+.if al == 'a'
+call inputA
+.elseif al == 'd'
+call inputD
+.elseif al == 's'
+call inputS
+.elseif al == 'w'
+call inputW
+.else
+ret
+.endif
+ret
+userInput endp
+loseCondition proc
+mov edx,offset board
+mov ecx,0
+.while ecx != 48
+mov ebx,[edx]
+mov esi,[edx+4]
+.if ecx != 12 || ecx != 28 || ecx != 44
+.if ebx == esi || ebx == 0
+ret
+.endif
+.endif
+.if ebx == [edx+16]
+ret
+.endif
+add ecx,4
+.endw
+mov edx,offset board
+add edx,48
+mov ecx,0
+mov edi,0
+.while ecx != 5
+.if [edx] == edi
+ret
+.endif
+add edx,4
+.endw
+mov endcond,1
+ret
+loseCondition endp
+
+dispScore proc
+mov dh,4
+mov dl,45
+call gotoxy
+mov eax, black + (lightred * 16) ; white on red
+    call SetTextColor
+mov eax,' '
+call writechar
+mov edx,offset sc
+call writestring
+mov eax, white + (lightred * 16) ; white on red
+    call SetTextColor
+mov eax,score
+call writedec
+mov eax,' '
+call writechar
+ret
+dispScore endp
+
+main PROC
+.while 1
+call genRandom
+
+call drawBoard
+call userInput
+call windcondition
+call loseCondition
+.if endcond == 1
+mov edx,offset youlose
+call writestring
+exit
+.endif
+call clrscr
+call dispScore
+
+
+.endw
+ exit
+main ENDP
+END main
